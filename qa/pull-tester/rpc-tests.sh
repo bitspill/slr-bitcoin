@@ -31,7 +31,6 @@ testScripts=(
 testScriptsExt=(
     'bigblocks.py'
     'bipdersig-p2p.py'
-    'bipdersig.py'
     'getblocktemplate_longpoll.py'
     'getblocktemplate_proposals.py'
     'pruning.py'
