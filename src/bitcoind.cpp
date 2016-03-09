@@ -33,6 +33,10 @@
 
 static bool fDaemon;
 
+#if ENABLE_DAEMONLIB
+extern void WaitForShutdown(boost::thread_group* threadGroup);
+#endif
+
 void WaitForShutdown(boost::thread_group* threadGroup)
 {
     bool fShutdown = ShutdownRequested();
@@ -166,6 +170,7 @@ bool AppInit(int argc, char* argv[])
     return fRet;
 }
 
+#if !ENABLE_DAEMONLIB
 int main(int argc, char* argv[])
 {
     SetupEnvironment();
@@ -175,3 +180,4 @@ int main(int argc, char* argv[])
 
     return (AppInit(argc, argv) ? 0 : 1);
 }
+#endif

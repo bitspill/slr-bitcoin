@@ -119,6 +119,12 @@ AC_ARG_ENABLE([reduce-exports],
   [use_reduce_exports=$enableval],
   [use_reduce_exports=no])
 
+AC_ARG_ENABLE([daemonlib],
+  [AS_HELP_STRING([--enable-daemonlib],
+  [compile all of bitcoind as a library (default is no)])],
+  [use_daemonlib=$enableval],
+  [use_daemonlib=no])
+
 AC_ARG_ENABLE([ccache],
   [AS_HELP_STRING([--enable-ccache],
   [use ccache for building (default is yes if ccache is found)])],
@@ -402,6 +408,9 @@ fi
 if test x$use_hardening != xno; then
   AX_CHECK_COMPILE_FLAG([-Wstack-protector],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -Wstack-protector"])
   AX_CHECK_COMPILE_FLAG([-fstack-protector-all],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -fstack-protector-all"])
+  if test x$use_daemonlib = xno; then
+    AX_CHECK_COMPILE_FLAG([-fPIE],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -fPIE"])
+  fi
 
   AX_CHECK_PREPROC_FLAG([-D_FORTIFY_SOURCE=2],[
     AX_CHECK_PREPROC_FLAG([-U_FORTIFY_SOURCE],[
@@ -415,7 +424,7 @@ if test x$use_hardening != xno; then
   AX_CHECK_LINK_FLAG([[-Wl,-z,relro]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,relro"])
   AX_CHECK_LINK_FLAG([[-Wl,-z,now]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -Wl,-z,now"])
 
-  if test x$TARGET_OS != xwindows; then
+  if test x$TARGET_OS != xwindows -a x$use_daemonlib = xno; then
     # All windows code is PIC, forcing it on just adds useless compile warnings
     AX_CHECK_COMPILE_FLAG([-fPIE],[HARDENED_CXXFLAGS="$HARDENED_CXXFLAGS -fPIE"])
     AX_CHECK_LINK_FLAG([[-pie]], [HARDENED_LDFLAGS="$HARDENED_LDFLAGS -pie"])
@@ -430,6 +439,17 @@ if test x$use_hardening != xno; then
   CXXFLAGS="$CXXFLAGS $HARDENED_CXXFLAGS"
   CPPFLAGS="$CPPFLAGS $HARDENED_CPPFLAGS"
   LDFLAGS="$LDFLAGS $HARDENED_LDFLAGS"
+  OBJCXXFLAGS="$CXXFLAGS"
+fi
+
+AC_DEFINE([ENABLE_DAEMONLIB],[0],[Enable daemonlib.])
+AM_CONDITIONAL([ENABLE_DAEMONLIB],[false])
+if test x$use_daemonlib != xno; then
+  AX_CHECK_COMPILE_FLAG([-fPIC],[DAEMONLIB_CXXFLAGS="$DAEMONLIB_CXXFLAGS -fPIC"])
+  AC_DEFINE([ENABLE_DAEMONLIB],[1],[Enable daemonlib.])
+  AM_CONDITIONAL([ENABLE_DAEMONLIB],[true])
+  CXXFLAGS="$CXXFLAGS $DAEMONLIB_CXXFLAGS"
+  CPPFLAGS="$CPPFLAGS $DAEMONLIB_CPPFLAGS"
   OBJCXXFLAGS="$CXXFLAGS"
 fi
 
@@ -483,9 +503,16 @@ AC_LINK_IFELSE([AC_LANG_SOURCE([
   ]
 )
 
-if test x$use_reduce_exports = xyes; then
+if test x$use_reduce_exports = xyes -a x$use_daemonlib = xno; then
   AX_CHECK_COMPILE_FLAG([-fvisibility=hidden],[RE_CXXFLAGS="-fvisibility=hidden"],
   [AC_MSG_ERROR([Cannot set default symbol visibility. Use --disable-reduce-exports.])])
+fi
+
+AC_MSG_CHECKING([whether to compile as daemonlib])
+if test x$use_daemonlib != xno; then
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
 fi
 
 LEVELDB_CPPFLAGS=

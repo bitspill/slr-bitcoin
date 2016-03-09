@@ -1,6 +1,10 @@
 DIST_SUBDIRS = secp256k1
 AM_LDFLAGS = $(PTHREAD_CFLAGS) $(LIBTOOL_LDFLAGS)
 
+noinst_LTLIBRARIES =
+libbitcoind_la_LIBADD =
+libbitcoind_la_LDFLAGS = -no-undefined
+STATIC_EXTRA_LIBS = $(LIBLEVELDB) $(LIBMEMENV)
 
 if EMBEDDED_LEVELDB
 LEVELDB_CPPFLAGS += -I$(srcdir)/leveldb/include
@@ -49,22 +53,25 @@ BITCOIN_INCLUDES += $(BDB_CPPFLAGS)
 EXTRA_LIBRARIES += libbitcoin_wallet.a
 endif
 
-if BUILD_BITCOIN_LIBS
-lib_LTLIBRARIES = libbitcoinconsensus.la
-LIBBITCOIN_CONSENSUS=libbitcoinconsensus.la
-else
-LIBBITCOIN_CONSENSUS=
-endif
-
+LIBBITCOIN_CONSENSUS =
 bin_PROGRAMS =
 TESTS =
 
+if BUILD_BITCOIN_LIBS
+noinst_LTLIBRARIES += libbitcoinconsensus.la
+LIBBITCOIN_CONSENSUS += libbitcoinconsensus.la
+endif
+
+if !ENABLE_DAEMONLIB
 if BUILD_BITCOIND
   bin_PROGRAMS += bitcoind
 endif
 
 if BUILD_BITCOIN_UTILS
   bin_PROGRAMS += bitcoin-cli bitcoin-tx
+endif
+else
+noinst_LTLIBRARIES += libbitcoind.la
 endif
 
 .PHONY: FORCE
@@ -170,8 +177,11 @@ obj/build.h: FORCE
 	@$(MKDIR_P) $(builddir)/obj
 	@$(top_srcdir)/share/genbuild.sh $(abs_top_builddir)/src/obj/build.h \
 	  $(abs_top_srcdir)
-libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
+ARCH_PLATFORM = $(shell ../../bin/variables.sh host)
+
+libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
+clientversion.cpp: obj/build.h
 # server: shared between bitcoind and bitcoin-qt
 libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
 libbitcoin_server_a_SOURCES = \
@@ -310,9 +320,18 @@ nodist_libbitcoin_util_a_SOURCES = $(srcdir)/obj/build.h
 bitcoind_SOURCES = bitcoind.cpp
 bitcoind_CPPFLAGS = $(BITCOIN_INCLUDES)
 bitcoind_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
+libbitcoind_la_SOURCES = bitcoind.cpp
+libbitcoind_la_SOURCES += $(libbitcoin_util_a_SOURCES)
+libbitcoind_la_SOURCES += $(libbitcoin_univalue_a_SOURCES)
+libbitcoind_la_SOURCES += $(libbitcoin_crypto_a_SOURCES)
+libbitcoind_la_SOURCES += $(libbitcoin_common_a_SOURCES)
+libbitcoind_la_SOURCES += $(libbitcoin_server_a_SOURCES)
+libbitcoind_la_SOURCES += $(crypto_libbitcoin_crypto_a_SOURCES)
+libbitcoind_la_SOURCES += $(univalue_libbitcoin_univalue_a_SOURCES)
 
 if TARGET_WINDOWS
 bitcoind_SOURCES += bitcoind-res.rc
+libbitcoind_la_SOURCES += bitcoind-res.rc
 endif
 
 bitcoind_LDADD = \
@@ -327,10 +346,17 @@ bitcoind_LDADD = \
 
 if ENABLE_WALLET
 bitcoind_LDADD += libbitcoin_wallet.a
+libbitcoind_la_SOURCES += $(libbitcoin_wallet_a_SOURCES)
 endif
 
 bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS)
-#
+libbitcoind_la_LIBADD += $(SSL_LIBS) $(LIBSECP256K1) $(CRYPTO_LIBS) $(STATIC_EXTRA_LIBS)
+libbitcoind_la_CPPFLAGS = $(BITCOIN_INCLUDES)
+if TARGET_DARWIN
+libbitcoind_la_LDFLAGS += -Wl,-all_load
+else
+libbitcoind_la_LDFLAGS += -Wl,--whole-archive $(STATIC_EXTRA_LIBS) -Wl,--no-whole-archive
+endif
 
 # bitcoin-cli binary #
 bitcoin_cli_SOURCES = bitcoin-cli.cpp

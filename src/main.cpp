@@ -1105,6 +1105,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         // Store transaction in memory
         pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+        GetNodeSignals().TxToMemPool(tx);
     }
 
     SyncWithWallets(tx, NULL);
