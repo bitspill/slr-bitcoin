@@ -1616,7 +1616,7 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus:
     // While it is technically feasible to verify the PoW, doing so takes several minutes as it
     // requires recomputing every PoW hash during every Litecoin startup.
     // We opt instead to simply trust the data that is on your local disk.
-    // if (!CheckProofOfWork(block.GetPowHash(), block.nBits, consensusParams))
+    // if (!CheckProofOfWork(block.GetPoWHash(), block.nBits, consensusParams))
     //    return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     return true;
@@ -3459,7 +3459,7 @@ bool FindUndoPos(CValidationState &state, int nFile, CDiskBlockPos &pos, unsigne
 bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool fCheckPOW)
 {
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetPowHash(), block.nBits, Params().GetConsensus()))
+    if (fCheckPOW && !CheckProofOfWork(block.GetPoWwHash(), block.nBits, Params().GetConsensus()))
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
                          REJECT_INVALID, "high-hash");
 
