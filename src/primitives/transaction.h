@@ -224,6 +224,7 @@ public:
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
+    const std::string strTxComment;
 
     /** Construct a CTransaction that qualifies as IsNull() */
     CTransaction();
@@ -242,6 +243,9 @@ public:
         READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
         READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
         READWRITE(*const_cast<uint32_t*>(&nLockTime));
+        if (nVersion >= 2) {
+            READWRITE(*const_cast<std::string*>(&strTxComment));
+        }
         if (ser_action.ForRead())
             UpdateHash();
     }
@@ -290,6 +294,7 @@ struct CMutableTransaction
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     uint32_t nLockTime;
+    std::string strTxComment;
 
     CMutableTransaction();
     CMutableTransaction(const CTransaction& tx);
@@ -303,6 +308,8 @@ struct CMutableTransaction
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
+        if (nVersion >= 2) {
+            READWRITE(strTxComment);        }
     }
 
     /** Compute the hash of this CMutableTransaction. This is computed on the
