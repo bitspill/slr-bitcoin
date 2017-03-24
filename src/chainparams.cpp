@@ -116,12 +116,13 @@ public:
         assert(consensus.hashGenesisBlock == uint256S("0xedcf32dbfd327fe7f546d3a175d91b05e955ec1224e087961acc9a2aa8f592ee"));
         assert(genesis.hashMerkleRoot == uint256S("0x33ecdb1985425f576c65e2c85d7983edc6207038a2910fefaf86cfb4e53185a3"));
 
-        vSeeds.push_back(CDNSSeedData("dnsseed1", "dnsseed.solarcoin.org"));
-        vSeeds.push_back(CDNSSeedData("dnsseed2", "dnsseed2.solarcoin.org"));
-        vSeeds.push_back(CDNSSeedData("dnsseed3", "dnsseed3.solarcoin.org"));
-        vSeeds.push_back(CDNSSeedData("dnsseed-pnosker", "dnsseed.pnosker.com"));
-        vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc", "dnsseed.kryptochaos.com"));
-        vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc3", "seed.kryptochaos.com"));
+        // ToDo: Get some live DNS Seeds
+        // vSeeds.push_back(CDNSSeedData("dnsseed1", "dnsseed.solarcoin.org"));
+        // vSeeds.push_back(CDNSSeedData("dnsseed2", "dnsseed2.solarcoin.org"));
+        // vSeeds.push_back(CDNSSeedData("dnsseed3", "dnsseed3.solarcoin.org"));
+        // vSeeds.push_back(CDNSSeedData("dnsseed-pnosker", "dnsseed.pnosker.com"));
+        // vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc", "dnsseed.kryptochaos.com"));
+        // vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc3", "seed.kryptochaos.com"));
 
         //PUBKEY_ADDRESS_TEST = 115,
         //SCRIPT_ADDRESS_TEST = 198,
