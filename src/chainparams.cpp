@@ -121,8 +121,8 @@ public:
         vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc", "dnsseed.kryptochaos.com"));
         vSeeds.push_back(CDNSSeedData("dnsseed-pcmerc3", "seed.kryptochaos.com"));
 
-        PUBKEY_ADDRESS_TEST = 115,
-        SCRIPT_ADDRESS_TEST = 198,
+        //PUBKEY_ADDRESS_TEST = 115,
+        //SCRIPT_ADDRESS_TEST = 198,
         base58Prefixes[PUBKEY_ADDRESS] = std::vector<unsigned char>(1,18); // SolarCoin addresses start with 8
         base58Prefixes[SCRIPT_ADDRESS] = std::vector<unsigned char>(1,5);
         base58Prefixes[SECRET_KEY] =     std::vector<unsigned char>(1,128);
