@@ -8,8 +8,8 @@
 /**
  * network protocol versioning
  */
-
-static const int PROTOCOL_VERSION = 70012;
+// ToDo: Actual version is 70012 but old solarcoin nodes don't accept anything but 70005
+static const int PROTOCOL_VERSION = 70005;
 
 //! initial proto version, to be increased after version/verack negotiation
 static const int INIT_PROTO_VERSION = 209;
