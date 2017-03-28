@@ -3460,7 +3460,7 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
 {
 
     if (fDebug) {
-        std::cout << "Checking block header (" << block.GetHash().ToString() << ") " << std::endl << block << std::endl;
+        std::cout << "Checking block header (" << block.GetHash().ToString() << ") nBits: " << std::hex << block.nBits << std::dec << std::endl;
     }
     // Check proof of work matches claimed amount
     if (fCheckPOW && !CheckProofOfWork(block.GetPoWHash(), block.nBits, Params().GetConsensus()))
