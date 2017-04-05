@@ -5,13 +5,145 @@
 
 #include "pow.h"
 
+#include "chainparams.h"
 #include "arith_uint256.h"
 #include "chain.h"
 #include "primitives/block.h"
 #include "uint256.h"
 #include "util.h"
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
+#include <cmath>
+
+//unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
+//{
+//    int DiffMode = 1;
+//    if (fTestNet)
+//    {
+//        if (pindexLast->nHeight+1 >= 1) { DiffMode = 2; }
+//    }
+//    else
+//    {
+//        if (pindexLast->nHeight+1 >= 310000) { DiffMode = 2; }
+//    }
+//
+//    if (DiffMode == 1)
+//    {
+//        return GetNextTargetRequiredV1(pindexLast, fProofOfStake);
+//    }
+//    else
+//    {
+//        return GetNextTargetRequiredV2(pindexLast, fProofOfStake);
+//    }
+//}
+
+unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBlockHeader *pblock, uint64_t TargetBlocksSpacingSeconds, uint64_t PastBlocksMin, uint64_t PastBlocksMax, const Consensus::Params& params) {
+//
+//    if (pindexLast->nHeight+1 == 160 && (params.NetworkIDString() != CBaseChainParams::TESTNET))
+//        return UintToArith256(params.posLimit).GetCompact();
+
+    const CBlockIndex *BlockLastSolved  = pindexLast;
+    const CBlockIndex *BlockReading = pindexLast;
+    uint64_t  PastBlocksMass  = 0;
+    int64_t   PastRateActualSeconds   = 0;
+    int64_t   PastRateTargetSeconds   = 0;
+    double  PastRateAdjustmentRatio = double(1);
+    arith_uint256 PastDifficultyAverage;
+    arith_uint256 PastDifficultyAveragePrev;
+    double  EventHorizonDeviation;
+    double  EventHorizonDeviationFast;
+    double  EventHorizonDeviationSlow;
+
+    if (BlockLastSolved == NULL || BlockLastSolved->nHeight == 0 || (uint64_t)BlockLastSolved->nHeight < PastBlocksMin) { return UintToArith256(params.powLimit).GetCompact(); }
+
+    int64_t LatestBlockTime = BlockLastSolved->GetBlockTime();
+
+    for (unsigned int i = 1; BlockReading && BlockReading->nHeight > 0; i++) {
+        if (PastBlocksMax > 0 && i > PastBlocksMax) { break; }
+        PastBlocksMass++;
+
+        if (i == 1){
+            PastDifficultyAverage.SetCompact(BlockReading->nBits);
+        } else {
+            PastDifficultyAverage = ((arith_uint256().SetCompact(BlockReading->nBits) - PastDifficultyAveragePrev) / i) + PastDifficultyAveragePrev;
+        }
+
+        PastDifficultyAveragePrev = PastDifficultyAverage;
+        PastRateActualSeconds   = BlockLastSolved->GetBlockTime() - BlockReading->GetBlockTime();
+
+        if (LatestBlockTime < BlockReading->GetBlockTime()) {
+            if (BlockReading->nHeight > 16000) { // HARD Fork block number
+                LatestBlockTime = BlockReading->GetBlockTime();
+            }
+        }
+        PastRateActualSeconds   = LatestBlockTime - BlockReading->GetBlockTime();
+        PastRateTargetSeconds   = TargetBlocksSpacingSeconds * PastBlocksMass;
+        PastRateAdjustmentRatio = double(1);
+
+        if (PastRateActualSeconds < 0) {
+            PastRateActualSeconds = 0;
+        }
+        if (BlockReading->nHeight > 16000) { // HARD Fork block number
+            if (PastRateActualSeconds < 1) {
+                PastRateActualSeconds = 1;
+            }
+        } else {
+            if (PastRateActualSeconds < 0) { PastRateActualSeconds = 0; }
+        }
+        if (PastRateActualSeconds != 0 && PastRateTargetSeconds != 0) {
+            PastRateAdjustmentRatio = double(PastRateTargetSeconds) / double(PastRateActualSeconds);
+        }
+        EventHorizonDeviation   = 1 + (0.7084 * std::pow((double(PastBlocksMass)/double(144)), -1.228));
+        EventHorizonDeviationFast   = EventHorizonDeviation;
+        EventHorizonDeviationSlow   = 1 / EventHorizonDeviation;
+
+        if (PastBlocksMass >= PastBlocksMin) {
+            if ((PastRateAdjustmentRatio <= EventHorizonDeviationSlow) || (PastRateAdjustmentRatio >= EventHorizonDeviationFast)) {
+                assert(BlockReading);
+                break;
+            }
+        }
+        if (BlockReading->pprev == NULL) {
+            assert(BlockReading);
+            break;
+        }
+        BlockReading = BlockReading->pprev;
+    }
+
+    arith_uint256 bnNew(PastDifficultyAverage);
+    arith_uint256 bnProofOfWorkLimit = UintToArith256(params.powLimit);
+    if (PastRateActualSeconds != 0 && PastRateTargetSeconds != 0) {
+        bnNew *= PastRateActualSeconds;
+        bnNew /= PastRateTargetSeconds;
+    }
+    if (bnNew > bnProofOfWorkLimit) {
+        bnNew = bnProofOfWorkLimit;
+    }
+
+    /// debug print
+    printf("Difficulty Retarget - Gravity Well\n");
+    printf("PastRateAdjustmentRatio = %g\n", PastRateAdjustmentRatio);
+    printf("Before: %08x %s\n", BlockLastSolved->nBits, arith_uint256().SetCompact(BlockLastSolved->nBits).ToString().c_str());
+    printf("After: %08x %s\n", bnNew.GetCompact(), bnNew.ToString().c_str());
+
+    return bnNew.GetCompact();
+}
+
+unsigned int static GetNextWorkRequired_V2(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params){
+    // Kimoto Gravity Well (Patched for Time-warp exploit 4/5/14)
+    static const int64_t  BlocksTargetSpacing = 60; // 1 minute
+    unsigned int TimeDaySeconds  = 60 * 60 * 24;
+    int64_t   PastSecondsMin  = TimeDaySeconds * 0.1;
+    int64_t   PastSecondsMax  = TimeDaySeconds * 2.8;
+    uint64_t  PastBlocksMin   = PastSecondsMin / BlocksTargetSpacing;
+    uint64_t  PastBlocksMax   = PastSecondsMax / BlocksTargetSpacing;
+
+    if (/*(params.NetworkIDString() == CBaseChainParams::TESTNET) &&*/ GetBoolArg("-zerogravity", false))
+        return UintToArith256(params.powLimit).GetCompact();
+    else
+        return KimotoGravityWell(pindexLast, pblock, BlocksTargetSpacing, PastBlocksMin, PastBlocksMax, params);
+}
+
+unsigned int GetNextWorkRequired_V1(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
 
@@ -57,6 +189,20 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     assert(pindexFirst);
 
     return CalculateNextWorkRequired(pindexLast, pindexFirst->GetBlockTime(), params);
+}
+
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params){
+    int DiffMode = 1;
+//    if (Params().NetworkIDString() == CBaseChainParams::TESTNET) {
+//        if (pindexLast->nHeight+1 >= 1) { DiffMode = 2; }
+//    }
+//    else {
+        if (pindexLast->nHeight+1 >= 310000) { DiffMode = 2; }
+//    }
+
+    if (DiffMode == 1) { return GetNextWorkRequired_V1(pindexLast, pblock, params); }
+    else if (DiffMode == 2) { return GetNextWorkRequired_V2(pindexLast, pblock, params); }
+    return GetNextWorkRequired_V2(pindexLast, pblock, params);
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
