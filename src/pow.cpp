@@ -11,6 +11,7 @@
 #include "primitives/block.h"
 #include "uint256.h"
 #include "util.h"
+#include "bignum.h"
 
 #include <cmath>
 
@@ -47,8 +48,8 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
     int64_t   PastRateActualSeconds   = 0;
     int64_t   PastRateTargetSeconds   = 0;
     double  PastRateAdjustmentRatio = double(1);
-    arith_uint256 PastDifficultyAverage;
-    arith_uint256 PastDifficultyAveragePrev;
+    CBigNum PastDifficultyAverage;
+    CBigNum PastDifficultyAveragePrev;
     double  EventHorizonDeviation;
     double  EventHorizonDeviationFast;
     double  EventHorizonDeviationSlow;
@@ -64,7 +65,7 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
         if (i == 1){
             PastDifficultyAverage.SetCompact(BlockReading->nBits);
         } else {
-            PastDifficultyAverage = ((arith_uint256().SetCompact(BlockReading->nBits) - PastDifficultyAveragePrev) / i) + PastDifficultyAveragePrev;
+            PastDifficultyAverage = ((CBigNum().SetCompact(BlockReading->nBits) - PastDifficultyAveragePrev) / i) + PastDifficultyAveragePrev;
         }
 
         PastDifficultyAveragePrev = PastDifficultyAverage;
@@ -109,8 +110,8 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
         BlockReading = BlockReading->pprev;
     }
 
-    arith_uint256 bnNew(PastDifficultyAverage);
-    arith_uint256 bnProofOfWorkLimit = UintToArith256(params.powLimit);
+    CBigNum bnNew(PastDifficultyAverage);
+    CBigNum bnProofOfWorkLimit(params.powLimit);
     if (PastRateActualSeconds != 0 && PastRateTargetSeconds != 0) {
         bnNew *= PastRateActualSeconds;
         bnNew /= PastRateTargetSeconds;
@@ -122,8 +123,8 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
     /// debug print
     printf("Difficulty Retarget - Gravity Well\n");
     printf("PastRateAdjustmentRatio = %g\n", PastRateAdjustmentRatio);
-    printf("Before: %08x %s\n", BlockLastSolved->nBits, arith_uint256().SetCompact(BlockLastSolved->nBits).ToString().c_str());
-    printf("After: %08x %s\n", bnNew.GetCompact(), bnNew.ToString().c_str());
+    printf("Before: %08x %s\n", BlockLastSolved->nBits, CBigNum().SetCompact(BlockLastSolved->nBits).getuint256().ToString().c_str());
+    printf("After: %08x %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
 
     return bnNew.GetCompact();
 }
