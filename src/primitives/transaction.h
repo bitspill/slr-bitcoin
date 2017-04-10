@@ -207,7 +207,10 @@ private:
 
 public:
     // Default transaction version.
-    static const int32_t CURRENT_VERSION=1;
+    static const int LEGACY_VERSION_1 = 1;
+    static const int LEGACY_VERSION_2 = 2; // V3 - Includes nTime
+    static const int LEGACY_VERSION_3 = 3; // V4 - Includes nTime in tx hash
+    static const int CURRENT_VERSION = 4;
 
     // Changing the default transaction version requires a two step process: first
     // adapting relay policy by bumping MAX_STANDARD_VERSION, and then later date
@@ -221,6 +224,7 @@ public:
     // and bypass the constness. This is safe, as they update the entire
     // structure, including the hash.
     const int32_t nVersion;
+    const unsigned int nTime;
     const std::vector<CTxIn> vin;
     const std::vector<CTxOut> vout;
     const uint32_t nLockTime;
@@ -240,10 +244,13 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(*const_cast<int32_t*>(&this->nVersion));
         nVersion = this->nVersion;
+        if (nVersion >  LEGACY_VERSION_3) {
+            READWRITE(*const_cast<unsigned int*>(&nTime));
+        }
         READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
         READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
         READWRITE(*const_cast<uint32_t*>(&nLockTime));
-        if (nVersion >= 2) {
+        if (nVersion > LEGACY_VERSION_1) {
             READWRITE(*const_cast<std::string*>(&strTxComment));
         }
         if (ser_action.ForRead())
@@ -274,6 +281,12 @@ public:
         return (vin.size() == 1 && vin[0].prevout.IsNull());
     }
 
+    bool IsCoinStake() const
+    {
+        // ppcoin: the coin stake transaction is marked with the first output empty
+        return (vin.size() > 0 && (!vin[0].prevout.IsNull()) && vout.size() >= 2 && vout[0].IsEmpty());
+    }
+
     friend bool operator==(const CTransaction& a, const CTransaction& b)
     {
         return a.hash == b.hash;
@@ -291,6 +304,7 @@ public:
 struct CMutableTransaction
 {
     int32_t nVersion;
+    unsigned int nTime;
     std::vector<CTxIn> vin;
     std::vector<CTxOut> vout;
     uint32_t nLockTime;
@@ -305,11 +319,15 @@ struct CMutableTransaction
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
+        if (nVersion > CTransaction::LEGACY_VERSION_3) {
+            READWRITE(nTime);
+        }
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
-        if (nVersion >= 2) {
-            READWRITE(strTxComment);        }
+        if (nVersion >= CTransaction::LEGACY_VERSION_1) {
+            READWRITE(strTxComment);
+        }
     }
 
     /** Compute the hash of this CMutableTransaction. This is computed on the
