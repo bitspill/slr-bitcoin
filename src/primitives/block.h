@@ -29,6 +29,9 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
+    static const int LEGACY_VERCION_2 = 2;
+    static const int CURRENT_VERSION = 3;
+
     CBlockHeader()
     {
         SetNull();
@@ -78,6 +81,8 @@ class CBlock : public CBlockHeader
 public:
     // network and disk
     std::vector<CTransaction> vtx;
+    // ppcoin: block signature - signed by one of the coin base txout[N]'s owner
+    std::vector<unsigned char> vchBlockSig;
 
     // memory only
     mutable bool fChecked;
@@ -98,6 +103,9 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(*(CBlockHeader*)this);
+        if (nVersion >= CBlockHeader::CURRENT_VERSION) {
+            READWRITE(vchBlockSig);
+        }
         READWRITE(vtx);
     }
 
@@ -105,6 +113,7 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
+        vchBlockSig.clear();
         fChecked = false;
     }
 
