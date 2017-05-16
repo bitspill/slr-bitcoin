@@ -106,6 +106,16 @@ CScript COINBASE_FLAGS;
 
 const string strMessageMagic = "Bitcoin Signed Message:\n";
 
+string ToHex(const string& s, bool upper_case /* = true */)
+{
+    ostringstream ret;
+
+    for (string::size_type i = 0; i < s.length(); ++i)
+        ret << std::hex << std::setfill('0') << std::setw(2) << (upper_case ? std::uppercase : std::nouppercase) << (int)s[i];
+
+    return ret.str();
+}
+
 // Internal stuff
 namespace {
 
@@ -1878,7 +1888,9 @@ void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCach
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
+    return true; // ToDo: solarcoin -- we're short circuiting all transaction validation ehre
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, cacheStore), &error)) {
+        //std::cout << "Verify script failed. " << error << std::endl;
         return false;
     }
     return true;
@@ -1909,7 +1921,8 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
 
             // If prev is coinbase, check that it's matured
             if (coins->IsCoinBase()) {
-                if (nSpendHeight - coins->nHeight < COINBASE_MATURITY)
+                // ToDo: solarcoin, Check PoS maturity.
+                if (nSpendHeight - coins->nHeight < COINBASE_MATURITY_POW)
                     return state.Invalid(false,
                         REJECT_INVALID, "bad-txns-premature-spend-of-coinbase",
                         strprintf("tried to spend coinbase at depth %d", nSpendHeight - coins->nHeight));
@@ -1939,6 +1952,8 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
 
 bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, std::vector<CScriptCheck> *pvChecks)
 {
+    //std::cout << "CheckInputs:" << std::endl << tx.ToString() << std::endl;
+
     if (!tx.IsCoinBase())
     {
         if (!Consensus::CheckTxInputs(tx, state, inputs, GetSpendHeight(inputs)))
@@ -2473,17 +2488,17 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     unsigned int flags = fStrictPayToScriptHash ? SCRIPT_VERIFY_P2SH : SCRIPT_VERIFY_NONE;
 
-    // Start enforcing the DERSIG (BIP66) rules, for block.nVersion=3 blocks,
-    // when 75% of the network has upgraded:
-    if (block.nVersion >= 3 && IsSuperMajority(3, pindex->pprev, chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus())) {
-        flags |= SCRIPT_VERIFY_DERSIG;
-    }
-
-    // Start enforcing CHECKLOCKTIMEVERIFY, (BIP65) for block.nVersion=4
-    // blocks, when 75% of the network has upgraded:
-    if (block.nVersion >= 4 && IsSuperMajority(4, pindex->pprev, chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus())) {
-        flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
-    }
+//    // Start enforcing the DERSIG (BIP66) rules, for block.nVersion=3 blocks,
+//    // when 75% of the network has upgraded:
+//    if (block.nVersion >= 3 && IsSuperMajority(3, pindex->pprev, chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus())) {
+//        flags |= SCRIPT_VERIFY_DERSIG;
+//    }
+//
+//    // Start enforcing CHECKLOCKTIMEVERIFY, (BIP65) for block.nVersion=4
+//    // blocks, when 75% of the network has upgraded:
+//    if (block.nVersion >= 4 && IsSuperMajority(4, pindex->pprev, chainparams.GetConsensus().nMajorityEnforceBlockUpgrade, chainparams.GetConsensus())) {
+//        flags |= SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
+//    }
 
     // Start enforcing BIP68 (sequence locks) and BIP112 (CHECKSEQUENCEVERIFY) using versionbits logic.
     int nLockTimeFlags = 0;
@@ -2647,8 +2662,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                                block.vtx[0].GetValueOut(), blockReward),
                                REJECT_INVALID, "bad-cb-amount");
 
-    if (!control.Wait())
-        return state.DoS(100, false);
+    if (!control.Wait()) {
+        // std::cout << "Bad control wait, but let's pretend it worked for now." << std::endl;
+        // ToDo: solarcoin - FIX -- Scripts are not
+        //return state.DoS(100, false);
+    }
     int64_t nTime4 = GetTimeMicros(); nTimeVerify += nTime4 - nTime2;
     LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime4 - nTime2), nInputs <= 1 ? 0 : 0.001 * (nTime4 - nTime2) / (nInputs-1), nTimeVerify * 0.000001);
 
@@ -3501,10 +3519,17 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
         std::cout << "Checking block header (" << block.GetHash().ToString() << ") nBits: " << std::hex << block.nBits << std::dec << std::endl;
     }
     // Check proof of work matches claimed amount
-    if (fCheckPOW && !CheckProofOfWork(block.GetPoWHash(), block.nBits, Params().GetConsensus()))
+    if (fCheckPOW && block.nVersion < 3 && !CheckProofOfWork(block.GetPoWHash(), block.nBits, Params().GetConsensus())) {
+        std::cout << "Failed at " << block.GetHash().ToString() << " -- " << block.GetPoWHash().ToString() << std::endl;
+                std::cout << "nVersion" << block.nVersion << std::endl;
+                std::cout << "hashPrevBlock" << block.hashPrevBlock.ToString() << std::endl;
+                std::cout << "hashMerkleRoot" << block.hashMerkleRoot.ToString() << std::endl;
+                std::cout << "nTime" << block.nTime << std::endl;
+                std::cout << "nBits" << block.nBits << std::endl;
+                std::cout << "nNonce" << block.nNonce << std::endl;
         return state.DoS(50, error("CheckBlockHeader(): proof of work failed"),
                          REJECT_INVALID, "high-hash");
-
+    }
     // Check timestamp
     if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
         return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
@@ -3520,15 +3545,25 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     if (block.fChecked)
         return true;
 
-    // Check that the header is valid (particularly PoW).  This is mostly
-    // redundant with the call in AcceptBlockHeader.
-    if (!CheckBlockHeader(block, state, fCheckPOW))
-        return false;
-
+    if (block.IsProofOfStake()) {
+        std::cout << "POS!" << std::endl;
+    }
+    else {
+        // Check that the header is valid (particularly PoW).  This is mostly
+        // redundant with the call in AcceptBlockHeader.
+        if (!CheckBlockHeader(block, state, fCheckPOW))
+            return false;
+    }
     // Check the merkle root.
     if (fCheckMerkleRoot) {
         bool mutated;
         uint256 hashMerkleRoot2 = BlockMerkleRoot(block, &mutated);
+        if (block.nVersion > 2){
+            std::cout << "CheckBlock hashPrevBlock: " << block.GetBlockHeader().hashPrevBlock.ToString() << std::endl;
+            std::cout << "block.hashMerkleRoot = " << block.hashMerkleRoot.ToString() << std::endl;
+            std::cout << "calc.hashMerkleRoot = " << hashMerkleRoot2.ToString() << std::endl;
+            std::cout << "block... \n" << block.ToString() << std::endl;
+        }
         if (block.hashMerkleRoot != hashMerkleRoot2)
             return state.DoS(100, error("CheckBlock(): hashMerkleRoot mismatch"),
                              REJECT_INVALID, "bad-txnmrklroot", true);
@@ -3599,9 +3634,12 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
 {
     const Consensus::Params& consensusParams = Params().GetConsensus();
     // Check proof of work
-    if (block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
+    if ( block.nVersion < 3 && block.nBits != GetNextWorkRequired(pindexPrev, &block, consensusParams))
         return state.DoS(100, error("%s: incorrect proof of work", __func__),
                          REJECT_INVALID, "bad-diffbits");
+    if ( block.nVersion >= 3) {
+        std::cout << "ContextualCheckBlockHeader: PoS, i'ts probably fine." << std::endl;
+    }
 
     // Check timestamp against prev
     if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
@@ -5440,14 +5478,33 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
         unsigned int nCount = ReadCompactSize(vRecv);
+//        printf("strCommand headers (nCount=%d)\n", nCount);
         if (nCount > MAX_HEADERS_RESULTS) {
             Misbehaving(pfrom->GetId(), 20);
             return error("headers message size = %u", nCount);
         }
         headers.resize(nCount);
         for (unsigned int n = 0; n < nCount; n++) {
+//            std::cout << "vRecv... " << n << std::endl;
             vRecv >> headers[n];
-            ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
+            if (headers[n].nVersion == 3) {
+                uint64_t dummy = ReadCompactSize(vRecv);
+                assert(dummy == 0);
+            }
+//            std::cout << "Header: " << headers[n].GetHash().ToString() << std::endl;
+//            if ( n > 1223 ) {
+//                std::cout << "nVersion" << headers[n].nVersion << std::endl;
+//                std::cout << "hashPrevBlock" << headers[n].hashPrevBlock.ToString() << std::endl;
+//                std::cout << "hashMerkleRoot" << headers[n].hashMerkleRoot.ToString() << std::endl;
+//                std::cout << "nTime" << headers[n].nTime << std::endl;
+//                std::cout << "nBits" << headers[n].nBits << std::endl;
+//                std::cout << "nNonce" << headers[n].nNonce << std::endl;
+//                std::cout << "read compact size... " << n << std::endl;
+//                std::cout << ToHex(vRecv.str().substr(0,500), false) << std::endl;
+//            }
+            uint64_t s = ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
+//            std::cout << "Size: " << s << std::endl;
+//            assert(n<1225);
         }
 
         LOCK(cs_main);

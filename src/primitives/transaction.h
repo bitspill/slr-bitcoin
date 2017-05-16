@@ -11,6 +11,8 @@
 #include "serialize.h"
 #include "uint256.h"
 
+#include <iostream>
+
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
 {
@@ -155,6 +157,17 @@ public:
         return (nValue == -1);
     }
 
+    void SetEmpty()
+    {
+        nValue = 0;
+        scriptPubKey.clear();
+    }
+
+    bool IsEmpty() const
+    {
+        return (nValue == 0 && scriptPubKey.empty());
+    }
+
     uint256 GetHash() const;
 
     CAmount GetDustThreshold(const CFeeRate &minRelayTxFee) const
@@ -244,17 +257,30 @@ public:
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(*const_cast<int32_t*>(&this->nVersion));
         nVersion = this->nVersion;
-        if (nVersion >  LEGACY_VERSION_3) {
+//        std::cout << "Serialization nVersion after r/w: " << nVersion << std::endl;
+        if (!(nType & (SER_GETHASH|SER_LEGACYPROTOCOL)) || nVersion > LEGACY_VERSION_3) {
+//            std::cout << "Serialization nTime: " << nTime << std::endl;
+            READWRITE(*const_cast<unsigned int*>(&nTime));
+        } else if (nType & SER_DISK) {
+//            std::cout << "Serialization nTime: " << nTime << std::endl;
             READWRITE(*const_cast<unsigned int*>(&nTime));
         }
+//        std::cout << "reading vin" << std::endl;
         READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
+//        std::cout << "reading vout" << std::endl;
         READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
+//        std::cout << "reading nLockTime" << std::endl;
         READWRITE(*const_cast<uint32_t*>(&nLockTime));
         if (nVersion > LEGACY_VERSION_1) {
+//            std::cout << "Serialization strTxComment: " << strTxComment << std::endl;
             READWRITE(*const_cast<std::string*>(&strTxComment));
         }
-        if (ser_action.ForRead())
+//        std::cout << "ser_action for read" << std::endl;
+        if (ser_action.ForRead()) {
+//            std::cout << "update hash" << std::endl;
             UpdateHash();
+//            std::cout << "done hash" << std::endl;
+        }
     }
 
     bool IsNull() const {
@@ -319,13 +345,15 @@ struct CMutableTransaction
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
-        if (nVersion > CTransaction::LEGACY_VERSION_3) {
-            READWRITE(nTime);
+        if (!(nType & (SER_GETHASH|SER_LEGACYPROTOCOL)) || nVersion > LEGACY_VERSION_3) {
+            READWRITE(&nTime);
+        } else if (nType & SER_DISK) {
+            READWRITE(&nTime);
         }
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
-        if (nVersion >= CTransaction::LEGACY_VERSION_1) {
+        if (nVersion > CTransaction::LEGACY_VERSION_1) {
             READWRITE(strTxComment);
         }
     }

@@ -22,6 +22,8 @@ class CBlockHeader
 {
 public:
     // header
+    static const int LEGACY_VERCION_2 = 2;
+    static const int CURRENT_VERSION = 3;
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
@@ -29,8 +31,6 @@ public:
     uint32_t nBits;
     uint32_t nNonce;
 
-    static const int LEGACY_VERCION_2 = 2;
-    static const int CURRENT_VERSION = 3;
 
     CBlockHeader()
     {
@@ -103,10 +103,12 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(*(CBlockHeader*)this);
-        if (nVersion >= CBlockHeader::CURRENT_VERSION) {
+        //std::cout << "block serialize version..." << this->nVersion << std::endl;
+        if (this->nVersion >= CBlockHeader::CURRENT_VERSION) {
             READWRITE(vchBlockSig);
         }
         READWRITE(vtx);
+        //std::cout << "Block: " << this->ToString() << std::endl;
     }
 
     void SetNull()
@@ -130,6 +132,19 @@ public:
     }
 
     std::string ToString() const;
+
+    // ppcoin: entropy bit for stake modifier if chosen by modifier
+    unsigned int GetStakeEntropyBit(unsigned int nTime) const;
+
+    // ppcoin: two types of block: proof-of-work or proof-of-stake
+    bool IsProofOfStake() const;
+    bool IsProofOfWork() const;
+
+    std::pair<COutPoint, unsigned int> GetProofOfStake() const;
+
+    // ppcoin: get max transaction timestamp
+    int64_t GetMaxTransactionTime() const;
+
 };
 
 

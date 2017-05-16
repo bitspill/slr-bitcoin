@@ -1256,10 +1256,14 @@ bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, unsigne
     if (!EvalScript(stack, scriptPubKey, flags, checker, serror))
         // serror is set
         return false;
-    if (stack.empty())
+    if (stack.empty()) {
+        std::cout << "Empty stack." << std::endl;
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
-    if (CastToBool(stack.back()) == false)
+    }
+    if (CastToBool(stack.back()) == false) {
+        //std::cout << "Stack false." << std::endl;
         return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
+    }
 
     // Additional validation for spend-to-script-hash transactions:
     if ((flags & SCRIPT_VERIFY_P2SH) && scriptPubKey.IsPayToScriptHash())

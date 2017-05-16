@@ -155,6 +155,7 @@ uint256 BlockMerkleRoot(const CBlock& block, bool* mutated)
 {
     std::vector<uint256> leaves;
     leaves.resize(block.vtx.size());
+    std::cout << "Block.vtx.size " << block.vtx.size() << std::endl;
     for (size_t s = 0; s < block.vtx.size(); s++) {
         leaves[s] = block.vtx[s].GetHash();
     }

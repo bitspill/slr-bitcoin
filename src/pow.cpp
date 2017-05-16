@@ -121,10 +121,10 @@ unsigned int static KimotoGravityWell(const CBlockIndex* pindexLast, const CBloc
     }
 
     /// debug print
-    printf("Difficulty Retarget - Gravity Well\n");
-    printf("PastRateAdjustmentRatio = %g\n", PastRateAdjustmentRatio);
-    printf("Before: %08x %s\n", BlockLastSolved->nBits, CBigNum().SetCompact(BlockLastSolved->nBits).getuint256().ToString().c_str());
-    printf("After: %08x %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+//    printf("Difficulty Retarget - Gravity Well\n");
+//    printf("PastRateAdjustmentRatio = %g\n", PastRateAdjustmentRatio);
+//    printf("Before: %08x %s\n", BlockLastSolved->nBits, CBigNum().SetCompact(BlockLastSolved->nBits).getuint256().ToString().c_str());
+//    printf("After: %08x %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
 
     return bnNew.GetCompact();
 }
@@ -193,6 +193,8 @@ unsigned int GetNextWorkRequired_V1(const CBlockIndex* pindexLast, const CBlockH
 }
 
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params){
+//   std::cout << "GetNextWorkRequired last height: " << pindexLast->nHeight << std::endl;
+
     int DiffMode = 1;
 //    if (Params().NetworkIDString() == CBaseChainParams::TESTNET) {
 //        if (pindexLast->nHeight+1 >= 1) { DiffMode = 2; }
