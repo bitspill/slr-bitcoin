@@ -5487,10 +5487,6 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         for (unsigned int n = 0; n < nCount; n++) {
 //            std::cout << "vRecv... " << n << std::endl;
             vRecv >> headers[n];
-            if (headers[n].nVersion == 3) {
-                uint64_t dummy = ReadCompactSize(vRecv);
-                assert(dummy == 0);
-            }
 //            std::cout << "Header: " << headers[n].GetHash().ToString() << std::endl;
 //            if ( n > 1223 ) {
 //                std::cout << "nVersion" << headers[n].nVersion << std::endl;
@@ -5505,6 +5501,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             uint64_t s = ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
 //            std::cout << "Size: " << s << std::endl;
 //            assert(n<1225);
+            if (headers[n].nVersion >= CBlockHeader::CURRENT_VERSION) {
+                ReadCompactSize(vRecv); // ignore vchBlockSig count; assume it is 0.
+            }
         }
 
         LOCK(cs_main);
