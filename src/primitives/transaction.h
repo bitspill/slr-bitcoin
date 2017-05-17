@@ -345,10 +345,10 @@ struct CMutableTransaction
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         READWRITE(this->nVersion);
         nVersion = this->nVersion;
-        if (!(nType & (SER_GETHASH|SER_LEGACYPROTOCOL)) || nVersion > LEGACY_VERSION_3) {
-            READWRITE(&nTime);
+        if (!(nType & (SER_GETHASH|SER_LEGACYPROTOCOL)) || nVersion > CTransaction::LEGACY_VERSION_3) {
+            READWRITE(nTime);
         } else if (nType & SER_DISK) {
-            READWRITE(&nTime);
+            READWRITE(nTime);
         }
         READWRITE(vin);
         READWRITE(vout);
